@@ -1,7 +1,8 @@
 (ns xitdb-clj-example.core
+  (:require [clojure.test :refer [is]])
   (:import [io.github.radarroark.xitdb
             CoreFile CoreMemory Hasher Database RandomAccessMemory
-            Database$ContextFunction Database$Bytes
+            Database$ContextFunction Database$Bytes Database$Uint
             ReadCursor WriteCursor
             ReadArrayList ReadHashMap
             WriteArrayList WriteHashMap]
@@ -17,9 +18,43 @@
           hasher (Hasher. (java.security.MessageDigest/getInstance "SHA-1"))
           db (Database. core hasher)
           history (WriteArrayList. (.rootCursor db))]
+      ;; create new transaction to write data
       (.appendContext history
                       (.getSlot history -1)
                       (reify Database$ContextFunction
                         (^void run [this ^WriteCursor cursor]
-                          (let [moment (WriteHashMap. cursor)]
-                            (.put moment "foo" (Database$Bytes. "bar")))))))))
+                          ;; this will produce a data structure that looks like this:
+                          ;;
+                          ;; {"foo" "bar"
+                          ;;  "fruits" ["apple" "pear" "grape"]
+                          ;;  "people" [{"name" "Alice"
+                          ;;             "age" 25}
+                          ;;            {"name" "Bob"
+                          ;;             "age" 42}]}
+                          (let [moment (WriteHashMap. cursor)
+                                fruits (WriteArrayList. (.putCursor moment "fruits"))
+                                people (WriteArrayList. (.putCursor moment "people"))]
+                            (.put moment "foo" (Database$Bytes. "bar"))
+                            (doto fruits
+                              (.append (Database$Bytes. "apple"))
+                              (.append (Database$Bytes. "pear"))
+                              (.append (Database$Bytes. "grape")))
+                            (doto (WriteHashMap. (.appendCursor people))
+                              (.put "name" (Database$Bytes. "Alice"))
+                              (.put "age" (Database$Uint. 25)))
+                            (doto (WriteHashMap. (.appendCursor people))
+                              (.put "name" (Database$Bytes. "Bob"))
+                              (.put "age" (Database$Uint. 42)))))))
+      ;; read the data from the latest transaction
+      (let [moment (ReadHashMap. (.getCursor history -1))
+            foo-cursor (.getCursor moment "foo")
+            fruits (ReadArrayList. (.getCursor moment "fruits"))
+            people (ReadArrayList. (.getCursor moment "people"))]
+        (is (= "bar" (String. (.readBytes foo-cursor nil))))
+        (is (= "apple" (String. (.readBytes (.getCursor fruits 0) nil))))
+        (let [bob (ReadHashMap. (.getCursor people 1))
+              bob-name (.getCursor bob "name")
+              bob-age (.getCursor bob "age")]
+          (is (= "Bob" (String. (.readBytes bob-name nil))))
+          (is (= 42 (.readUint bob-age))))))))
+
