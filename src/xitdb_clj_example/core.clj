@@ -1,8 +1,8 @@
 (ns xitdb-clj-example.core
   (:require [clojure.test :refer [is]])
   (:import [io.github.radarroark.xitdb
-            CoreFile CoreMemory Hasher Database RandomAccessMemory
-            Database$ContextFunction Database$Bytes Database$Uint
+            CoreFile CoreMemory Hasher RandomAccessMemory Tag
+            Database Database$ContextFunction Database$Bytes Database$Uint
             ReadCursor WriteCursor
             ReadArrayList ReadHashMap
             WriteArrayList WriteHashMap]
@@ -56,5 +56,10 @@
               bob-name (.getCursor bob "name")
               bob-age (.getCursor bob "age")]
           (is (= "Bob" (String. (.readBytes bob-name nil))))
-          (is (= 42 (.readUint bob-age))))))))
+          (is (= 42 (.readUint bob-age))))
+        ;; if you don't know the type of a cursor, you can check it like this
+        (is (= Tag/ARRAY_LIST (-> moment (.getCursor "people") .slot .tag)))
+        (is (= Tag/HASH_MAP (-> moment (.getCursor "people") ReadArrayList. (.getCursor 1) .slot .tag)))
+        ;; byte arrays <= 8 are SHORT_BYTES, so you should check for either type like this
+        (is (contains? #{Tag/SHORT_BYTES Tag/BYTES} (-> foo-cursor .slot .tag)))))))
 
