@@ -1,5 +1,5 @@
 {:paths ["src"]
- :deps {io.github.radarroark/xitdb {:mvn/version "0.20.0"}}
+ :deps {io.github.radarroark/xitdb {:mvn/version "0.21.0"}}
  :aliases {:file {:exec-fn xitdb-clj-example.core/run
                   :exec-args {:db-kind :file}}
            :memory {:exec-fn xitdb-clj-example.core/run
