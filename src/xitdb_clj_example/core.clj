@@ -1,7 +1,7 @@
 (ns xitdb-clj-example.core
   (:require [clojure.test :refer [is]])
   (:import [io.github.radarroark.xitdb
-            CoreFile CoreMemory CoreBufferedFile Hasher RandomAccessMemory RandomAccessBufferedFile Tag
+            Core CoreMemory CoreBufferedFile Hasher RandomAccessMemory RandomAccessBufferedFile Tag
             Database Database$ContextFunction Database$Bytes Database$Uint
             ReadCursor WriteCursor
             ReadArrayList ReadHashMap
@@ -9,13 +9,10 @@
            [java.io File]))
 
 (defn run [{:keys [db-kind]}]
-  (with-open [ra (case db-kind
-                   :file (RandomAccessBufferedFile. (File. "main.db") "rw")
-                   :memory (RandomAccessMemory.))]
-    (let [core (case db-kind
-                 :file (CoreBufferedFile. ra)
-                 :memory (CoreMemory. ra))
-          hasher (Hasher. (java.security.MessageDigest/getInstance "SHA-1"))
+  (with-open [^Core core (case db-kind
+                          :file (CoreBufferedFile. (RandomAccessBufferedFile. (File. "main.db") "rw"))
+                          :memory (CoreMemory. (RandomAccessMemory.)))]
+    (let [hasher (Hasher. (java.security.MessageDigest/getInstance "SHA-1"))
           db (Database. core hasher)
           history (WriteArrayList. (.rootCursor db))]
       ;; create new transaction to write data
@@ -62,4 +59,3 @@
         (is (= Tag/HASH_MAP (-> moment (.getCursor "people") ReadArrayList. (.getCursor 1) .slot .tag)))
         ;; byte arrays <= 8 are SHORT_BYTES, so you should check for either type like this
         (is (contains? #{Tag/SHORT_BYTES Tag/BYTES} (-> foo-cursor .slot .tag)))))))
-
